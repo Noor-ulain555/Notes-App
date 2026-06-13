@@ -1,15 +1,13 @@
 package com.example.mynotes;
 
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.ImageView;
 import android.widget.Toast;
-import androidx.annotation.Nullable;
+
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.cardview.widget.CardView;
-import androidx.core.content.ContextCompat;
 import androidx.lifecycle.ViewModelProvider;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -18,11 +16,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.mynotes.databinding.ActivityMainBinding;
 
 public class MainActivity extends AppCompatActivity {
+
     private ActivityMainBinding binding;
     private NoteViewModel noteViewModel;
     private NoteAdapter noteAdapter;
 
-    CardView cardView;
+    private ActivityResultLauncher<Intent> addNoteLauncher;
+    private ActivityResultLauncher<Intent> updateNoteLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,83 +31,105 @@ public class MainActivity extends AppCompatActivity {
         setContentView(binding.getRoot());
 
         noteViewModel = new ViewModelProvider(this).get(NoteViewModel.class);
-//        cardView=findViewById(R.id.cv);
 
-        RecyclerView recyclerView = binding.rv;
-        noteAdapter = new NoteAdapter(new NoteAdapter.OnNoteClickListener() {
-//            @Override
-//            public void onNoteDeleteClick(int position) {
-//                // Handle the click event to delete the item
-//                noteViewModel.delete(noteAdapter.getNoteAt(position));
-//
-//                Toast.makeText(MainActivity.this, "Note deleted", Toast.LENGTH_SHORT).show();
-//            }
+        setupLaunchers();
+        setupAdapter();
+        setupRecyclerView();
+        setupObserver();
+        setupSwipeGestures();
+        setupFab();
+    }
 
-        },noteViewModel);
-
-            recyclerView.setAdapter(noteAdapter);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        noteViewModel.getNoteList().observe(this, notes -> {
-            noteAdapter.setNotes(notes);
-        });
-
-        ItemTouchHelper.SimpleCallback itemTouchHelperCallback = new ItemTouchHelper.SimpleCallback(0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
-            @Override
-            public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
-                return false;
-            }
-            @Override
-            public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
-
-                final int position = viewHolder.getAdapterPosition();
-//                View itemView = viewHolder.itemView;
-//                CardView cardView = itemView.findViewById(R.id.cv);
-
-                if (direction == ItemTouchHelper.RIGHT) {
-
-                    noteViewModel.delete(noteAdapter.getNoteAt(position));
-//                    cardView.setBackgroundColor(ContextCompat.getColor(MainActivity.this, R.color.red));
-
-                    Toast.makeText(MainActivity.this, "Note Deleted", Toast.LENGTH_SHORT).show();
-                } else {
-                    Intent intent = new Intent(MainActivity.this, DataInsertActivity2.class);
-                    intent.putExtra("type","update");
-                    intent.putExtra("title", noteAdapter.getNoteAt(position).getTitle());
-                    intent.putExtra("disp", noteAdapter.getNoteAt(position).getDisp());
-                    intent.putExtra("id", noteAdapter.getNoteAt(position).getId());
-                    startActivityForResult(intent, 2);
-//                    Toast.makeText(MainActivity.this, "updating", Toast.LENGTH_SHORT).show();
+    private void setupLaunchers() {
+        addNoteLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    String title = result.getData().getStringExtra("title");
+                    String disp = result.getData().getStringExtra("disp");
+                    noteViewModel.insert(new note(title, disp));
+                    Toast.makeText(this, "Note added", Toast.LENGTH_SHORT).show();
                 }
-         }
-        };
-        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(itemTouchHelperCallback);
-        itemTouchHelper.attachToRecyclerView(recyclerView);
-        binding.floatingActionButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, DataInsertActivity2.class);
-                intent.putExtra("type","addMode");
-                startActivityForResult(intent, 1);
             }
+        );
+
+        updateNoteLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                    String title = result.getData().getStringExtra("title");
+                    String disp = result.getData().getStringExtra("disp");
+                    int id = result.getData().getIntExtra("id", -1);
+                    if (id != -1) {
+                        note updated = new note(title, disp);
+                        updated.setId(id);
+                        noteViewModel.update(updated);
+                        Toast.makeText(this, "Note updated", Toast.LENGTH_SHORT).show();
+                    }
+                }
+            }
+        );
+    }
+
+    private void setupAdapter() {
+        noteAdapter = new NoteAdapter(noteToEdit -> {
+            Intent intent = new Intent(this, DataInsertActivity2.class);
+            intent.putExtra("type", "update");
+            intent.putExtra("title", noteToEdit.getTitle());
+            intent.putExtra("disp", noteToEdit.getDisp());
+            intent.putExtra("id", noteToEdit.getId());
+            updateNoteLauncher.launch(intent);
         });
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == 1 && resultCode == RESULT_OK) {
-            String title = data.getStringExtra("title");
-            String disp = data.getStringExtra("disp");
-            note notes = new note(title, disp);
-            noteViewModel.insert(notes);
-            Toast.makeText(this, "Note added", Toast.LENGTH_SHORT).show();
-        } else if (requestCode == 2) {
-            String title = data.getStringExtra("title");
-            String disp = data.getStringExtra("disp");
-            note notes = new note(title, disp);
-            notes.setId(data.getIntExtra("id", 0));
-            noteViewModel.update(notes);
-            Toast.makeText(this, "Note Updated", Toast.LENGTH_LONG).show();
-        }
+    private void setupRecyclerView() {
+        binding.rv.setAdapter(noteAdapter);
+        binding.rv.setLayoutManager(new LinearLayoutManager(this));
+    }
+
+    private void setupObserver() {
+        noteViewModel.getNoteList().observe(this, notes -> {
+            noteAdapter.setNotes(notes);
+            binding.emptyState.setVisibility(
+                (notes == null || notes.isEmpty()) ? View.VISIBLE : View.GONE
+            );
+        });
+    }
+
+    private void setupSwipeGestures() {
+        ItemTouchHelper.SimpleCallback callback = new ItemTouchHelper.SimpleCallback(
+            0, ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT) {
+
+            @Override
+            public boolean onMove(RecyclerView rv, RecyclerView.ViewHolder vh, RecyclerView.ViewHolder target) {
+                return false;
+            }
+
+            @Override
+            public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
+                int position = viewHolder.getAdapterPosition();
+                if (direction == ItemTouchHelper.RIGHT) {
+                    noteViewModel.delete(noteAdapter.getNoteAt(position));
+                    Toast.makeText(MainActivity.this, "Note deleted", Toast.LENGTH_SHORT).show();
+                } else {
+                    note noteToEdit = noteAdapter.getNoteAt(position);
+                    Intent intent = new Intent(MainActivity.this, DataInsertActivity2.class);
+                    intent.putExtra("type", "update");
+                    intent.putExtra("title", noteToEdit.getTitle());
+                    intent.putExtra("disp", noteToEdit.getDisp());
+                    intent.putExtra("id", noteToEdit.getId());
+                    updateNoteLauncher.launch(intent);
+                }
+            }
+        };
+        new ItemTouchHelper(callback).attachToRecyclerView(binding.rv);
+    }
+
+    private void setupFab() {
+        binding.floatingActionButton.setOnClickListener(v -> {
+            Intent intent = new Intent(this, DataInsertActivity2.class);
+            intent.putExtra("type", "addMode");
+            addNoteLauncher.launch(intent);
+        });
     }
 }

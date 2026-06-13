@@ -1,8 +1,6 @@
 package com.example.mynotes;
 
 import android.app.Application;
-import android.provider.ContactsContract;
-
 import androidx.lifecycle.LiveData;
 import java.util.List;
 import java.util.concurrent.Executor;

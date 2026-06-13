@@ -1,29 +1,24 @@
 package com.example.mynotes;
 
-import android.graphics.Color;
-import android.text.style.BackgroundColorSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+
 import androidx.annotation.NonNull;
-import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
+
 import java.util.ArrayList;
 import java.util.List;
+
 public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder> {
 
-
     private List<note> noteList = new ArrayList<>();
-    private OnNoteClickListener onNoteClickListener;
-    private NoteViewModel noteViewModel; // Add a reference to your ViewModel
+    private final OnNoteClickListener listener;
 
-    //    public NoteAdapter(OnNoteClickListener listener, NoteViewModel viewModel) {
-    public NoteAdapter(OnNoteClickListener listener, NoteViewModel viewModel) {
-
-        this.onNoteClickListener = listener;
-        this.noteViewModel = viewModel; // Initialize your ViewModel
+    public NoteAdapter(OnNoteClickListener listener) {
+        this.listener = listener;
     }
 
     public void setNotes(List<note> notes) {
@@ -40,11 +35,8 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder
 
     @Override
     public void onBindViewHolder(@NonNull NoteViewHolder holder, int position) {
-        note note = noteList.get(position);
-        holder.bind(note);
-
+        holder.bind(noteList.get(position), listener);
     }
-
 
     @Override
     public int getItemCount() {
@@ -55,56 +47,31 @@ public class NoteAdapter extends RecyclerView.Adapter<NoteAdapter.NoteViewHolder
         return noteList.get(position);
     }
 
-    public void removeItem(int position) {
-        noteList.remove(position);
-        notifyItemRemoved(position);
-    }
-
-    class NoteViewHolder extends RecyclerView.ViewHolder {
-        private TextView titleTextView;
-        private TextView descriptionTextView;
-        private ImageView deleteIcon;
-        private ImageView updateIcon;
+    static class NoteViewHolder extends RecyclerView.ViewHolder {
+        private final TextView titleTextView;
+        private final TextView descriptionTextView;
+        private final ImageView editIcon;
 
         NoteViewHolder(View itemView) {
             super(itemView);
             titleTextView = itemView.findViewById(R.id.titlerv);
             descriptionTextView = itemView.findViewById(R.id.discription);
-            deleteIcon = itemView.findViewById(R.id.deleteIcon);
-            deleteIcon.setVisibility(View.GONE); // Initially hide the delete icon
-            updateIcon = itemView.findViewById(R.id.update);
-            updateIcon.setVisibility(View.GONE);
-
-
-            deleteIcon.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    int position = getAdapterPosition();
-                    if (position != RecyclerView.NO_POSITION) {
-//                        onNoteClickListener.onNoteDeleteClick(position);
-                    }
-                }
-            });
+            editIcon = itemView.findViewById(R.id.update);
         }
 
-
-        void bind(note note) {
+        void bind(note note, OnNoteClickListener listener) {
             titleTextView.setText(note.getTitle());
             descriptionTextView.setText(note.getDisp());
-
+            itemView.setOnClickListener(v -> {
+                if (listener != null) listener.onNoteClick(note);
+            });
+            editIcon.setOnClickListener(v -> {
+                if (listener != null) listener.onNoteClick(note);
+            });
         }
     }
 
     public interface OnNoteClickListener {
-//        void onNoteDeleteClick(int position);
-
+        void onNoteClick(note note);
     }
-
-
 }
-
-
-
-
-
-
